@@ -24,23 +24,27 @@ def register_attempt(ip):
     _attempts.setdefault(ip, []).append(time.time())
 
 
+LIMITED_PATHS = {"/api/auth/login", "/api/auth/register"}
+
+
 class LoginThrottleMiddleware:
-    """Не более LOGIN_RATE_LIMIT попыток входа в минуту с одного IP."""
+    """Не более LOGIN_RATE_LIMIT (по умолчанию 10) попыток входа/регистрации
+    в минуту с одного IP."""
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path == "/api/auth/login" and request.method == "POST":
+        if request.path in LIMITED_PATHS and request.method == "POST":
             ip = client_ip(request)
             if is_limited(ip):
                 from django.http import JsonResponse
                 return JsonResponse(
-                    {"errors": {"detail": "Слишком много попыток входа. Повторите через минуту."}},
+                    {"errors": {"detail": "Слишком много попыток. Повторите через минуту."}},
                     status=429,
                 )
             response = self.get_response(request)
-            if response.status_code in (400, 401):
+            if response.status_code in (400, 401, 409):
                 register_attempt(ip)
             else:
                 _attempts.pop(ip, None)

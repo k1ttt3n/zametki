@@ -112,6 +112,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "notes.jwt_cookie.CookieJWTAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
@@ -119,6 +120,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+# куки с JWT: access — httpOnly (не читается JS), refresh — httpOnly, путь /api/auth
+ACCESS_TOKEN_COOKIE = env("ACCESS_TOKEN_COOKIE", "access_token")
+REFRESH_TOKEN_COOKIE = env("REFRESH_TOKEN_COOKIE", "refresh_token")
+AUTH_COOKIE_SECURE = env("AUTH_COOKIE_SECURE", "1" if not DEBUG else "0") == "1"
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),

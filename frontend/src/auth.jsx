@@ -8,17 +8,15 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token) { setLoading(false); return }
+    // токен лежит в httpOnly-куке — проверяем сессию через /auth/me
     api.get('/auth/me')
       .then((r) => setUser(r.data))
-      .catch(() => localStorage.removeItem('token'))
+      .catch(() => setUser(null))
       .finally(() => setLoading(false))
   }, [])
 
   const login = async (identifier, password) => {
     const r = await api.post('/auth/login', { email: identifier, password })
-    localStorage.setItem('token', r.data.token)
     setUser(r.data.user)
     return r.data.user
   }
@@ -28,8 +26,7 @@ export function AuthProvider({ children }) {
   }
 
   const logout = async () => {
-    try { await api.post('/auth/logout') } catch (e) { /* токен уже недействителен */ }
-    localStorage.removeItem('token')
+    try { await api.post('/auth/logout') } catch (e) { /* куки уже очищены */ }
     setUser(null)
   }
 

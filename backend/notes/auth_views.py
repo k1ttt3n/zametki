@@ -9,6 +9,27 @@ from rest_framework.views import APIView
 from .models import User, USERNAME_RE
 
 
+def set_auth_cookies(resp, access, refresh):
+    """Access-токен — в httpOnly-куке (JS недоступен), refresh — в отдельной httpOnly-куке."""
+    resp.set_cookie(
+        settings.ACCESS_TOKEN_COOKIE, access,
+        max_age=int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds()),
+        httponly=True, samesite="Lax", secure=settings.AUTH_COOKIE_SECURE, path="/",
+    )
+    resp.set_cookie(
+        settings.REFRESH_TOKEN_COOKIE, refresh,
+        max_age=int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds()),
+        httponly=True, samesite="Lax", secure=settings.AUTH_COOKIE_SECURE, path="/api/auth",
+    )
+    return resp
+
+
+def clear_auth_cookies(resp):
+    resp.delete_cookie(settings.ACCESS_TOKEN_COOKIE, path="/")
+    resp.delete_cookie(settings.REFRESH_TOKEN_COOKIE, path="/api/auth")
+    return resp
+
+
 def err(field, message):
     return {"errors": {field: message}}
 
@@ -99,21 +120,45 @@ class LoginView(APIView):
         from rest_framework_simplejwt.tokens import RefreshToken
 
         token = RefreshToken.for_user(user)
-        return Response({
-            "token": str(token.access_token),
-            "refresh": str(token),
+        resp = Response({
             "user": {"id": user.id, "email": user.email,
                      "username": user.username, "role": user.role},
         }, status=status.HTTP_200_OK)
+        # токен отдаётся только в httpOnly-куках, в теле ответа его нет
+        return set_auth_cookies(resp, str(token.access_token), str(token))
+
+
+class RefreshView(APIView):
+    """POST /api/auth/refresh — обновить access-токен из refresh-куки."""
+
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        from rest_framework_simplejwt.exceptions import TokenError
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        raw = request.COOKIES.get(settings.REFRESH_TOKEN_COOKIE)
+        if not raw:
+            return Response({"errors": {"detail": "Нет токена обновления"}},
+                            status=status.HTTP_401_UNAUTHORIZED)
+        try:
+            token = RefreshToken(raw)
+            access = str(token.access_token)
+        except TokenError:
+            return clear_auth_cookies(
+                Response({"errors": {"detail": "Сессия истекла, войдите снова"}},
+                         status=status.HTTP_401_UNAUTHORIZED))
+        resp = Response(status=status.HTTP_204_NO_CONTENT)
+        return set_auth_cookies(resp, access, str(token))
 
 
 class LogoutView(APIView):
-    """POST /api/auth/logout — выход; токен удаляется на клиенте."""
+    """POST /api/auth/logout — выход; куки с токенами удаляются."""
 
     def post(self, request):
         resp = Response(status=status.HTTP_204_NO_CONTENT)
-        resp.delete_cookie("sessionid")
-        return resp
+        return clear_auth_cookies(resp)
 
 
 class MeView(APIView):

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { validateFile } from '../validation'
+import { getCsrfToken } from '../csrf'
 
 export default function FileUpload({ note, onUploaded, onError }) {
   const [file, setFile] = useState(null)
@@ -22,7 +23,8 @@ export default function FileUpload({ note, onUploaded, onError }) {
       fd.append('file', file)
       const resp = await fetch(`/api/notes/${note.id}/files`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        credentials: 'include', // access-токен берётся из httpOnly-куки браузером
+        headers: { 'X-CSRFToken': getCsrfToken() },
         body: fd,
       })
       if (!resp.ok) {

@@ -1,5 +1,7 @@
 from django.urls import path
 from django.http import JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET
 
 from . import views, auth_views
 
@@ -8,10 +10,19 @@ def health(request):
     return JsonResponse({"status": "ok"})
 
 
+@require_GET
+@ensure_csrf_cookie
+def csrf_token(request):
+    """GET /api/csrf — выдаёт куку csrftoken для запросов с JWT-куками."""
+    return JsonResponse({"ok": True})
+
+
 urlpatterns = [
     path("health", health),
+    path("csrf", csrf_token),
     path("auth/register", auth_views.RegisterView.as_view()),
     path("auth/login", auth_views.LoginView.as_view()),
+    path("auth/refresh", auth_views.RefreshView.as_view()),
     path("auth/logout", auth_views.LogoutView.as_view()),
     path("auth/me", auth_views.MeView.as_view()),
     path("notes", views.NoteListCreateView.as_view()),
