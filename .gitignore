@@ -3,3 +3,7 @@ __pycache__/
 db.sqlite3
 *.log
 node_modules/
+dist/
+.env
+staticfiles/
+backend/uploads/
