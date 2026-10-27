@@ -2,8 +2,9 @@ import logging
 import re
 
 from django.conf import settings
-from django.contrib.auth import authenticate
-from django.db import IntegrityError
+from django.contrib.auth import password_validation
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -73,18 +74,39 @@ class RegisterView(APIView):
         if password != confirm:
             errors["password_confirm"] = "Пароли не совпадают"
 
+        if not errors:
+            # Django-валидаторы из settings.AUTH_PASSWORD_VALIDATORS
+            # (минимальная длина, запрет полностью цифровых паролей)
+            try:
+                password_validation.validate_password(password)
+            except DjangoValidationError as e:
+                errors["password"] = " ".join(e.messages)
+
         if errors:
             return Response(err_first(errors), status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.create_user(email=email, username=username, password=password)
+            # атомарность нужна, чтобы при IntegrityError транзакция
+            # корректно откатывалась (иначе соединение «зависает» в ошибочном
+            # состоянии и все последующие запросы тоже падают с 500)
+            with transaction.atomic():
+                user = User.objects.create_user(email=email, username=username, password=password)
         except IntegrityError:
             # гонка двух параллельных регистраций или регистронезависимый дубль в БД
             logger.exception("Register integrity error")
-            return Response(
-                {"errors": {"detail": "Не удалось создать аккаунт, попробуйте ещё раз"}},
-                status=status.HTTP_409_CONFLICT,
-            )
+            # определяем, какое именно поле столкнулось с уникальным индексом,
+            # чтобы не показывать абстрактную «ошибку регистрации»
+            taken_email = User.objects.filter(email__iexact=email).exists()
+            taken_username = User.objects.filter(username__iexact=username).exists()
+            if taken_email and taken_username:
+                msg = "Этот email и логин уже заняты"
+            elif taken_email:
+                msg = "Этот email уже занят"
+            elif taken_username:
+                msg = "Этот логин уже занят"
+            else:
+                msg = "Не удалось создать аккаунт, попробуйте ещё раз"
+            return Response({"errors": {"detail": msg}}, status=status.HTTP_409_CONFLICT)
         except Exception:
             logger.exception("Register failed")
             return Response(

@@ -139,6 +139,48 @@ def main():
         '"password_confirm":"passw1234"}'), content_type="application/json")
     assert rr.status_code == 429, rr.status_code
 
+    # --- регистрация: понятные ошибки вместо «Ошибка регистрации» -------------
+    # email уже занят (в другом регистре) -> 400 с конкретным сообщением
+    c = fresh()
+    r = c.post("/api/auth/register", data=(
+        '{"email":"A@A.com","username":"other_user","password":"passw1234",'
+        '"password_confirm":"passw1234"}'), content_type="application/json")
+    assert r.status_code == 400 and "email" in r.json()["errors"], r.content
+
+    # полностью цифровой пароль -> 400 (проверяется на этапе валидации, до БД)
+    c = fresh()
+    r = c.post("/api/auth/register", data=(
+        '{"email":"d@d.com","username":"digits_only","password":"12345678",'
+        '"password_confirm":"12345678"}'), content_type="application/json")
+    assert r.status_code == 400 and "password" in r.json()["errors"], r.content
+
+    # IntegrityError (гонка двух параллельных регистраций) должен дать 409 с
+    # конкретным текстом, а не абстрактную ошибку. Эмулируем гонку: в момент
+    # pre-check пользователя нет, но к моменту INSERT он уже есть.
+    from notes import auth_views
+    orig_create_user = auth_views.User.objects.create_user
+
+    def racing_create_user(*a, **kw):
+        auth_views.User.objects.create_user = orig_create_user  # восстановить
+        # «параллельный» запрос создал точно такой же email/логин до нашего INSERT
+        orig_create_user(email="ghost@g.com", username="ghost_v", password="passw1234")
+        return orig_create_user(*a, **kw)  # обычный путь -> IntegrityError
+
+    auth_views.User.objects.create_user = racing_create_user
+    c = fresh()
+    r = c.post("/api/auth/register", data=(
+        '{"email":"ghost@g.com","username":"ghost_v","password":"passw1234",'
+        '"password_confirm":"passw1234"}'), content_type="application/json")
+    assert r.status_code == 409, (r.status_code, r.content)
+    assert "занят" in r.json()["errors"]["detail"], r.content
+
+    # после 409 соединение живо — следующая регистрация проходит (нет каскада 500)
+    c = fresh()
+    r = c.post("/api/auth/register", data=(
+        '{"email":"ok@ok.com","username":"user_ok","password":"passw1234",'
+        '"password_confirm":"passw1234"}'), content_type="application/json")
+    assert r.status_code == 201, (r.status_code, r.content)
+
     print("ALL OK")
 
 
