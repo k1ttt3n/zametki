@@ -98,6 +98,7 @@ class Note(models.Model):
     category_obj = models.ForeignKey(Category, null=True, blank=True,
                                      on_delete=models.SET_NULL, related_name="notes")
     is_pinned = models.BooleanField("закреплена", default=False)
+    is_favorite = models.BooleanField("в избранном", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

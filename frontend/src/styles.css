@@ -50,6 +50,8 @@ a:hover { text-decoration: underline; }
 .btn-icon { padding: 4px 8px; font-size: 14px; background: transparent; border: none; }
 .btn-icon.danger:hover { background: #fdecec; }
 .btn-icon.active { filter: saturate(1.6); }
+.btn-icon.fav { color: #e0a800; font-size: 16px; }
+.btn-icon.fav.active { color: #f5b800; text-shadow: 0 0 6px rgba(245,184,0,.4); }
 
 input, textarea, select {
   width: 100%; padding: 9px 12px; border: 1px solid var(--border);
@@ -151,5 +153,14 @@ label.checkbox.inline { margin-bottom: 0; white-space: nowrap; }
 .field-label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
 .cat-picker { display: flex; flex-direction: column; gap: 6px; }
 .radio.inline { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; margin-right: 14px; }
+/* компактный переключатель режима выбора категории */
+.cat-mode-toggle { display: inline-flex; gap: 0; align-self: flex-start; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg-btn {
+  border: none; background: var(--card); color: var(--muted); cursor: pointer;
+  padding: 4px 12px; font-size: 12.5px; line-height: 1.4;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn:hover { background: #f0f2f5; }
+.seg-btn.active { background: var(--primary); color: #fff; }
 .cat-new { display: flex; flex-direction: column; gap: 6px; }
 .muted { color: var(--muted); font-size: 13px; }

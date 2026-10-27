@@ -1,7 +1,7 @@
 import React from 'react'
 import api from '../api'
 
-export default function NoteCard({ note, onEdit, onDelete, onFileDeleted, onPinToggle, onAttach }) {
+export default function NoteCard({ note, onEdit, onDelete, onFileDeleted, onPinToggle, onFavoriteToggle, onAttach }) {
   const fmtDate = (iso) => {
     try {
       return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -34,6 +34,11 @@ export default function NoteCard({ note, onEdit, onDelete, onFileDeleted, onPinT
             title={note.is_pinned ? 'Открепить' : 'Закрепить'}
             onClick={() => onPinToggle(note)}
           >📌</button>
+          <button
+            className={`btn btn-icon ${note.is_favorite ? 'fav active' : ''}`}
+            title={note.is_favorite ? 'Убрать из избранного' : 'В избранное'}
+            onClick={() => onFavoriteToggle(note)}
+          >{note.is_favorite ? '★' : '☆'}</button>
           <button className="btn btn-icon" title="Редактировать" onClick={() => onEdit(note)}>✏️</button>
           <button className="btn btn-icon" title="Прикрепить файл" onClick={() => onAttach(note)}>📎</button>
           <button className="btn btn-icon danger" title="Удалить" onClick={() => onDelete(note)}>🗑️</button>

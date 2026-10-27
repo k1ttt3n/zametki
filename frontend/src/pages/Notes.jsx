@@ -21,14 +21,15 @@ export default function Notes() {
   const [search, setSearch] = useState('')
   const [categoryId, setCategoryId] = useState(null) // фильтр по узлу дерева
   const [pinnedOnly, setPinnedOnly] = useState(false)
+  const [favoriteOnly, setFavoriteOnly] = useState(false)
   const [editing, setEditing] = useState(null) // null | {} (новая) | note
   const [fileFor, setFileFor] = useState(null) // заметка, для которой грузим файл
   const [loading, setLoading] = useState(true)
   const [notice, setNotice] = useState('')
 
   const query = useMemo(
-    () => ({ page, limit: 12, search, category_id: categoryId ?? '', pinned: pinnedOnly ? '1' : '' }),
-    [page, search, categoryId, pinnedOnly],
+    () => ({ page, limit: 12, search, category_id: categoryId ?? '', pinned: pinnedOnly ? '1' : '', favorite: favoriteOnly ? '1' : '' }),
+    [page, search, categoryId, pinnedOnly, favoriteOnly],
   )
 
   const debouncedSearch = useMemo(() => debounce((v) => { setSearch(v); setPage(1) }, 350), [])
@@ -84,6 +85,17 @@ export default function Notes() {
     }
   }
 
+  const onFavoriteToggle = async (note) => {
+    try {
+      const r = await api.put(`/notes/${note.id}`, { ...note, is_favorite: !note.is_favorite })
+      setItems((prev) => prev.map((n) => (n.id === r.data.id ? r.data : n)))
+      // если включён фильтр «избранные» и заметка убрана — перечитываем список
+      if (favoriteOnly && !r.data.is_favorite) load()
+    } catch {
+      setNotice('Не удалось обновить заметку')
+    }
+  }
+
   const onFileUploaded = (noteId, fileData) => {
     setItems((prev) => prev.map((n) => (n.id === noteId ? { ...n, files: [...(n.files || []), fileData] } : n)))
     setFileFor(null)
@@ -124,6 +136,10 @@ export default function Notes() {
             <input type="checkbox" checked={pinnedOnly} onChange={(e) => { setPinnedOnly(e.target.checked); setPage(1) }} />
             Только закреплённые
           </label>
+          <label className="checkbox inline">
+            <input type="checkbox" checked={favoriteOnly} onChange={(e) => { setFavoriteOnly(e.target.checked); setPage(1) }} />
+            ★ Избранные
+          </label>
           <button className="btn btn-ghost" onClick={exportXlsx}>Экспорт .xlsx</button>
           <button className="btn btn-primary" onClick={() => setEditing({})}>+ Новая заметка</button>
         </div>
@@ -163,6 +179,7 @@ export default function Notes() {
                   onAttach={setFileFor}
                   onDelete={onDelete}
                   onPinToggle={onPinToggle}
+                  onFavoriteToggle={onFavoriteToggle}
                   onFileDeleted={onFileDeleted}
                 />
               ))}

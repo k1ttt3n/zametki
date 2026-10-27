@@ -19,20 +19,24 @@ export default function CategoryPicker({ valueId, onChange }) {
 
   return (
     <div className="cat-picker">
-      <label className="radio inline">
-        <input
-          type="radio" name="cat-mode" checked={mode === 'existing'}
-          onChange={() => { setMode('existing'); onChange({ category_id: null, new_category: null, new_category_parent: null }) }}
-        />
-        Выбрать из дерева
-      </label>
-      <label className="radio inline">
-        <input
-          type="radio" name="cat-mode" checked={mode === 'new'}
-          onChange={() => { setMode('new'); onChange({ category_id: null, new_category: '', new_category_parent: null }) }}
-        />
-        Создать новую
-      </label>
+      <div className="cat-mode-toggle" role="radiogroup" aria-label="Режим выбора категории">
+        <button
+          type="button"
+          role="radio" aria-checked={mode === 'existing'}
+          className={`seg-btn ${mode === 'existing' ? 'active' : ''}`}
+          onClick={() => { setMode('existing'); onChange({ category_id: null, new_category: null, new_category_parent: null }) }}
+        >
+          Из дерева
+        </button>
+        <button
+          type="button"
+          role="radio" aria-checked={mode === 'new'}
+          className={`seg-btn ${mode === 'new' ? 'active' : ''}`}
+          onClick={() => { setMode('new'); onChange({ category_id: null, new_category: '', new_category_parent: null }) }}
+        >
+          Новая
+        </button>
+      </div>
 
       {mode === 'existing' && (
         <select

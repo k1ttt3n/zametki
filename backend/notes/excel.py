@@ -21,7 +21,7 @@ def build_notes_xlsx(notes, prefix="notes"):
     ws = wb.active
     ws.title = "Данные"
 
-    headers = ["№", "Название", "Текст", "Категория", "Закреплена", "Создана", "Обновлена"]
+    headers = ["№", "Название", "Текст", "Категория", "Закреплена", "Избранная", "Создана", "Обновлена"]
     ws.append(headers)
     bold = Font(bold=True)
     for cell in ws[1]:
@@ -40,6 +40,7 @@ def build_notes_xlsx(notes, prefix="notes"):
             _safe(note.text),
             _safe(note.category),
             "Да" if note.is_pinned else "Нет",
+            "Да" if note.is_favorite else "Нет",
             note.created_at.date(),
             note.updated_at.date(),
         ])
@@ -49,7 +50,7 @@ def build_notes_xlsx(notes, prefix="notes"):
     ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(last_row, 1)}"
 
     # даты — форматом ДД.ММ.ГГГГ
-    for col in (6, 7):
+    for col in (7, 8):
         for r in range(2, last_row + 1):
             ws.cell(row=r, column=col).number_format = "DD.MM.YYYY"
 

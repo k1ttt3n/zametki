@@ -42,6 +42,9 @@ def filtered_notes(request):
     pinned = request.query_params.get("pinned")
     if pinned is not None and str(pinned).strip() != "":
         qs = qs.filter(is_pinned=_parse_bool(pinned))
+    favorite = request.query_params.get("favorite")
+    if favorite is not None and str(favorite).strip() != "":
+        qs = qs.filter(is_favorite=_parse_bool(favorite))
     return qs
 
 
@@ -87,6 +90,7 @@ class NoteListCreateView(APIView):
             category=category_name,
             category_obj=category_obj,
             is_pinned=_parse_bool(data.get("is_pinned", False)),
+            is_favorite=_parse_bool(data.get("is_favorite", False)),
         )
         return Response(serialize_note(note), status=201)
 
@@ -125,6 +129,8 @@ class NoteDetailView(APIView):
         note.category = category_name
         note.category_obj = category_obj
         note.is_pinned = _parse_bool(data.get("is_pinned", False))
+        if "is_favorite" in data:
+            note.is_favorite = _parse_bool(data.get("is_favorite"))
         note.save()
         return Response(serialize_note(note))
 
@@ -293,6 +299,7 @@ def serialize_note(note):
         "category": note.category,
         "category_id": note.category_obj_id,
         "is_pinned": note.is_pinned,
+        "is_favorite": note.is_favorite,
         "created_at": note.created_at.isoformat(),
         "updated_at": note.updated_at.isoformat(),
         "files": [serialize_file(f) for f in note.files.all()],
