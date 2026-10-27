@@ -21,6 +21,11 @@ settings.DATABASES["default"] = {
     "CONN_MAX_AGE": 0, "TEST": {},
 }
 
+# переподключаемся, иначе Django будет использовать уже созданный коннект
+# к файловой БД (db.sqlite3) вместо :memory:
+from django.db import connection  # noqa: E402
+connection.close()
+
 from django.core.management import call_command  # noqa: E402
 
 call_command("migrate", "--run-syncdb", verbosity=0)
@@ -28,7 +33,7 @@ call_command("migrate", "--run-syncdb", verbosity=0)
 from notes import throttle  # noqa: E402
 from notes.models import User  # noqa: E402
 
-User.objects.create_user(email="a@a.com", username="user_a", password="passw1234")
+User.objects.create_user(email="A@A.com", username="user_a", password="passw1234")
 
 from django.test import Client  # noqa: E402
 
