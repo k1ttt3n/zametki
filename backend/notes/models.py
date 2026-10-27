@@ -10,7 +10,10 @@ class UserManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra):
         if not email:
             raise ValueError("Email обязателен")
-        user = self.model(email=self.normalize_email(email), username=username, **extra)
+        # нормализуем перед сохранением — уникальный индекс в Postgres
+        # учитывает регистр (user@Mail.ru и user@mail.ru были бы разными)
+        user = self.model(email=self.normalize_email(email).lower(),
+                          username=username.strip(), **extra)
         user.set_password(password)  # пароль хранится хешем (PBKDF2)
         user.save(using=self._db)
         return user

@@ -32,7 +32,9 @@ export default function Register() {
       navigate('/login')
     } catch (err) {
       const data = err?.response?.data
-      if (data?.errors) setErrors(data.errors)
+      const detail = data?.errors?.detail || data?.detail
+      if (detail) setServerError(detail)
+      else if (data?.errors) setErrors(data.errors)
       else setServerError('Ошибка регистрации. Попробуйте позже.')
     } finally {
       setBusy(false)

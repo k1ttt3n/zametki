@@ -1,12 +1,16 @@
+import logging
 import re
 
 from django.conf import settings
 from django.contrib.auth import authenticate
-from rest_framework import serializers, status
+from django.db import IntegrityError
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import User, USERNAME_RE
+
+logger = logging.getLogger(__name__)
 
 
 def set_auth_cookies(resp, access, refresh):
@@ -72,7 +76,21 @@ class RegisterView(APIView):
         if errors:
             return Response(err_first(errors), status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_user(email=email, username=username, password=password)
+        try:
+            user = User.objects.create_user(email=email, username=username, password=password)
+        except IntegrityError:
+            # гонка двух параллельных регистраций или регистронезависимый дубль в БД
+            logger.exception("Register integrity error")
+            return Response(
+                {"errors": {"detail": "Не удалось создать аккаунт, попробуйте ещё раз"}},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except Exception:
+            logger.exception("Register failed")
+            return Response(
+                {"errors": {"detail": "Ошибка сервера. Попробуйте позже."}},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(
             {"id": user.id, "email": user.email, "username": user.username, "role": user.role},
             status=status.HTTP_201_CREATED,
@@ -108,13 +126,15 @@ class LoginView(APIView):
         else:
             user = User.objects.filter(username__iexact=identifier).first()
 
-        if user is None:
-            # проверяем пароль на несуществующем пользователе, чтобы ответ был одинаковым
-            authenticate(request, username="nonexistent", password=password)
-            return Response(generic, status=status.HTTP_401_UNAUTHORIZED)
+        if user is not None:
+            # проверяем хеш напрямую: authenticate() с кастомной моделью и
+            # включённым SessionMiddleware может 500 при отсутствии сессии
+            from django.contrib.auth.hashers import check_password
+            if not (user.is_active and user.password
+                    and check_password(password, user.password)):
+                user = None
 
-        checked = authenticate(request, username=user.email, password=password)
-        if checked is None:
+        if user is None:
             return Response(generic, status=status.HTTP_401_UNAUTHORIZED)
 
         from rest_framework_simplejwt.tokens import RefreshToken
