@@ -17,10 +17,7 @@ class Migration(migrations.Migration):
             ),
             lambda apps, schema_editor: None,
         ),
-        migrations.AddConstraint(
-            model_name="user",
-            constraint=models.UniqueConstraint(
-                Lower("email"), name="uniq_user_email_lower",
-            ),
-        ),
+        # AddConstraint перенесён в 0003: на sqlite выражения в
+        # UniqueConstraint не поддерживаются и Django пропускает их молча,
+        # из-за чего state/БД расходились с моделями.
     ]

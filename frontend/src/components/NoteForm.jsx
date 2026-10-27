@@ -1,14 +1,16 @@
 import React, { useState } from 'react'
 import api from '../api'
+import CategoryPicker from './CategoryPicker'
 import { validateNote } from '../validation'
 
 export default function NoteForm({ initial, onCancel, onSaved }) {
   const [form, setForm] = useState({
     title: initial?.title || '',
     text: initial?.text || '',
-    category: initial?.category || '',
+    category_id: initial?.category_id ?? null,
     is_pinned: !!initial?.is_pinned,
   })
+  const [newCat, setNewCat] = useState({ new_category: null, new_category_parent: null })
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
 
@@ -22,9 +24,12 @@ export default function NoteForm({ initial, onCancel, onSaved }) {
     if (Object.keys(errs).length) return
     setBusy(true)
     try {
+      // category_id — выбранная готовая категория; new_category — создаём новую из формы
+      const payload = { ...form, ...newCat }
+      if (payload.new_category === undefined) delete payload.new_category
       let resp
-      if (initial?.id) resp = await api.put(`/notes/${initial.id}`, form)
-      else resp = await api.post('/notes', form)
+      if (initial?.id) resp = await api.put(`/notes/${initial.id}`, payload)
+      else resp = await api.post('/notes', payload)
       onSaved(resp.data)
     } catch (err) {
       const data = err?.response?.data
@@ -49,11 +54,21 @@ export default function NoteForm({ initial, onCancel, onSaved }) {
         <textarea value={form.text} onChange={set('text')} rows={6} maxLength={10000} placeholder="Текст заметки" />
         {errors.text && <span className="field-error">{errors.text}</span>}
       </label>
-      <label>
-        Категория
-        <input value={form.category} onChange={set('category')} maxLength={64} placeholder="Например: Работа" />
+      <div className="field">
+        <span className="field-label">Категория</span>
+        <CategoryPicker
+          valueId={form.category_id}
+          onChange={(patch) => {
+            if ('category_id' in patch) setForm((f) => ({ ...f, category_id: patch.category_id }))
+            setNewCat((prev) => ({
+              new_category: 'new_category' in patch ? patch.new_category : prev.new_category,
+              new_category_parent:
+                patch.new_category_parent === undefined ? prev.new_category_parent : patch.new_category_parent,
+            }))
+          }}
+        />
         {errors.category && <span className="field-error">{errors.category}</span>}
-      </label>
+      </div>
       <label className="checkbox">
         <input type="checkbox" checked={form.is_pinned} onChange={set('is_pinned')} />
         Закрепить сверху

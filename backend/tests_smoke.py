@@ -10,25 +10,23 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "notesapp.settings")
 os.environ.setdefault("DJANGO_DEBUG", "1")
 os.environ.setdefault("AUTH_COOKIE_SECURE", "0")
+# Тестовая изолированная sqlite-БД: задаём через переменную окружения ДО
+# django.setup(), чтобы настройки не успели открыть коннект к dev-файлу
+# db.sqlite3 (в нём остаются тестовые пользователи и мешают миграции).
+test_db = os.path.join(os.getcwd(), "test_db.sqlite3")
+if os.path.exists(test_db):
+    os.remove(test_db)
+os.environ["DB_SQLITE_PATH"] = test_db
 django.setup()
 
 from django.conf import settings  # noqa: E402
 
-settings.DATABASES["default"] = {
-    "ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:",
-    "ATOMIC_REQUESTS": False, "AUTOCOMMIT": True, "TIME_ZONE": None,
-    "OPTIONS": {}, "USER": "", "PASSWORD": "", "HOST": "", "PORT": "",
-    "CONN_MAX_AGE": 0, "TEST": {},
-}
-
-# переподключаемся, иначе Django будет использовать уже созданный коннект
-# к файловой БД (db.sqlite3) вместо :memory:
-from django.db import connection  # noqa: E402
-connection.close()
+assert settings.DATABASES["default"]["NAME"] == test_db, \
+    "тест должен работать на изолированной БД, а не на db.sqlite3"
 
 from django.core.management import call_command  # noqa: E402
 
-call_command("migrate", "--run-syncdb", verbosity=0)
+call_command("migrate", verbosity=0)
 
 from notes import throttle  # noqa: E402
 from notes.models import User  # noqa: E402
@@ -74,6 +72,61 @@ def main():
     assert c.post("/api/auth/logout", HTTP_X_CSRFTOKEN=csrf).status_code == 204
     assert c.cookies["access_token"].value == ""
     assert c.get("/api/auth/me").status_code == 401
+
+    # --- дерево категорий + выбор/создание категории при добавлении заметки
+    c = fresh()
+    c.post("/api/auth/login", data='{"email":"a@a.com","password":"passw1234"}',
+           content_type="application/json")
+    c.get("/api/csrf")
+    csrf = c.cookies["csrftoken"].value
+
+    r = c.post("/api/categories", data='{"name":"Работа"}',
+               content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 201, r.content
+    work_id = r.json()["id"]
+
+    r = c.post("/api/categories", data='{"name":"Проекты","parent":%d}' % work_id,
+               content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 201, r.content
+    proj_id = r.json()["id"]
+
+    # дубль имени в одном родителе -> 409
+    r = c.post("/api/categories", data='{"name":"Работа"}',
+               content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 409, r.status_code
+
+    # цикл запрещён: Работа внутрь Проектов
+    r = c.patch("/api/categories/%d" % work_id, data='{"parent":%d}' % proj_id,
+                content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 400, r.status_code
+
+    # дерево
+    r = c.get("/api/categories/tree")
+    tree = r.json()["tree"]
+    assert tree[0]["name"] == "Работа" and tree[0]["children"][0]["name"] == "Проекты", tree
+
+    # заметка с готовой категорией по category_id
+    r = c.post("/api/notes", data='{"title":"N1","category_id":%d}' % proj_id,
+               content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 201 and r.json()["category_id"] == proj_id, r.content
+
+    # заметка с созданием новой категории прямо из формы
+    r = c.post("/api/notes", data='{"title":"N2","new_category":"Личное","new_category_parent":null}',
+               content_type="application/json", HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 201, r.content
+    personal_id = r.json()["category_id"]
+    assert personal_id, r.content
+
+    # фильтр по ветке дерева включает дочерние категории
+    r = c.get("/api/notes", {"category_id": work_id})
+    titles = [i["title"] for i in r.json()["items"]]
+    assert titles == ["N1"], titles
+
+    # удаление родителя снимает category_obj у заметок (SET_NULL)
+    r = c.delete("/api/categories/%d" % proj_id, HTTP_X_CSRFTOKEN=csrf)
+    assert r.status_code == 204
+    r = c.get("/api/notes", {"category_id": work_id})
+    assert r.json()["total"] == 0
 
     # rate limit: ровно 10 попыток в минуту, 11-я — 429 (login+register вместе)
     c = fresh()

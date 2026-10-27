@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Note, File, ALLOWED_FILE_TYPES
+from .models import Note, File, Category, ALLOWED_FILE_TYPES
 from .excel import build_notes_xlsx
 
 
@@ -31,6 +31,14 @@ def filtered_notes(request):
     category = (request.query_params.get("category") or "").strip()
     if category:
         qs = qs.filter(category__iexact=category)
+    try:
+        category_id = int(request.query_params.get("category_id") or 0)
+    except ValueError:
+        category_id = 0
+    if category_id:
+        from .category_views import _descendant_ids
+        ids = [category_id] + _descendant_ids(Category.objects.get(pk=category_id))
+        qs = qs.filter(category_obj_id__in=ids)
     pinned = request.query_params.get("pinned")
     if pinned is not None and str(pinned).strip() != "":
         qs = qs.filter(is_pinned=_parse_bool(pinned))
@@ -69,11 +77,15 @@ class NoteListCreateView(APIView):
         errors = validate_note(data)
         if errors:
             return Response({"errors": errors}, status=400)
+        category_name, category_obj = _resolve_category(request, data)
+        if isinstance(category_name, Response):
+            return category_name
         note = Note.objects.create(
             owner=request.user,
             title=str(data.get("title", "")).strip(),
             text=str(data.get("text", "") or ""),
-            category=str(data.get("category", "") or "").strip(),
+            category=category_name,
+            category_obj=category_obj,
             is_pinned=_parse_bool(data.get("is_pinned", False)),
         )
         return Response(serialize_note(note), status=201)
@@ -105,9 +117,13 @@ class NoteDetailView(APIView):
         errors = validate_note(data)
         if errors:
             return Response({"errors": errors}, status=400)
+        category_name, category_obj = _resolve_category(request, data)
+        if isinstance(category_name, Response):
+            return category_name
         note.title = str(data.get("title", "")).strip()
         note.text = str(data.get("text", "") or "")
-        note.category = str(data.get("category", "") or "").strip()
+        note.category = category_name
+        note.category_obj = category_obj
         note.is_pinned = _parse_bool(data.get("is_pinned", False))
         note.save()
         return Response(serialize_note(note))
@@ -212,6 +228,45 @@ class FileDeleteView(APIView):
         return Response(status=204)
 
 
+
+def _resolve_category(request, data):
+    """Возвращает (имя, объект) либо (ErrorResponse, None).
+
+    category_id — выбор готовой категории из дерева;
+    new_category — создание новой ветки (опционально внутри parent_id);
+    category (текст) — обратная совместимость со старыми клиентами.
+    """
+    from .category_views import _clean_name
+    cid = data.get("category_id")
+    if cid not in (None, "", 0, "0", "null"):
+        try:
+            cat = Category.objects.get(pk=int(cid), owner=request.user)
+        except (Category.DoesNotExist, ValueError, TypeError):
+            return Response(field_error("category", "Категория не найдена"), status=400), None
+        return cat.name, cat
+
+    if data.get("new_category"):
+        name, err = _clean_name(data.get("new_category"))
+        if err:
+            return Response(field_error("category", err), status=400), None
+        pid = data.get("new_category_parent")
+        parent = None
+        if pid not in (None, "", 0, "0", "null"):
+            parent = Category.objects.filter(pk=int(pid) if str(pid).isdigit() else 0,
+                                             owner=request.user).first()
+            if parent is None:
+                return Response(field_error("category", "Родительская категория не найдена"), status=400), None
+        cat, created = Category.objects.get_or_create(owner=request.user, parent=parent, name=name)
+        return cat.name, cat
+
+    raw = str(data.get("category", "") or "").strip()
+    if raw:
+        cat = Category.objects.filter(owner=request.user, name__iexact=raw,
+                                      parent__isnull=True).first()
+        return raw, cat
+    return "", None
+
+
 def validate_note(data):
     errors = {}
     title = str(data.get("title", "") or "").strip()
@@ -236,6 +291,7 @@ def serialize_note(note):
         "title": note.title,
         "text": note.text,
         "category": note.category,
+        "category_id": note.category_obj_id,
         "is_pinned": note.is_pinned,
         "created_at": note.created_at.isoformat(),
         "updated_at": note.updated_at.isoformat(),

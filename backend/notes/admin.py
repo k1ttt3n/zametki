@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Note, File
+from .models import User, Note, File, Category
 
 
 @admin.register(User)
@@ -16,3 +16,8 @@ class NoteAdmin(admin.ModelAdmin):
 @admin.register(File)
 class FileAdmin(admin.ModelAdmin):
     list_display = ("original_name", "note", "mime", "size_bytes")
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "owner", "parent")

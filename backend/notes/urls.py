@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
 
-from . import views, auth_views
+from . import views, auth_views, category_views
 
 
 def health(request):
@@ -25,6 +25,9 @@ urlpatterns = [
     path("auth/refresh", auth_views.RefreshView.as_view()),
     path("auth/logout", auth_views.LogoutView.as_view()),
     path("auth/me", auth_views.MeView.as_view()),
+    path("categories/tree", category_views.CategoryTreeView.as_view()),
+    path("categories", category_views.CategoryListCreateView.as_view()),
+    path("categories/<int:pk>", category_views.CategoryDetailView.as_view()),
     path("notes", views.NoteListCreateView.as_view()),
     path("notes/export/", views.NoteExportView.as_view()),
     path("notes/categories", views.NoteCategoriesView.as_view()),

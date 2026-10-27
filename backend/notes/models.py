@@ -3,6 +3,7 @@ import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.db.models.functions import Lower
 from django.utils import timezone
 
 
@@ -38,6 +39,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
 
+    class Meta:
+        constraints = [
+            # Регистронезависимая уникальность email на уровне БД
+            # (Postgres и sqlite >= 3.40; Django сам пропускает там, где
+            # выражения в индексах не поддерживаются).
+            models.UniqueConstraint(Lower("email"), name="uniq_user_email_lower"),
+        ]
+
     objects = UserManager()
 
     def __str__(self):
@@ -47,11 +56,47 @@ class User(AbstractBaseUser, PermissionsMixin):
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_]{3,30}$")
 
 
+class Category(models.Model):
+    """Дерево категорий: parent=None — корневая ветка."""
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="categories")
+    name = models.CharField("название", max_length=64)
+    parent = models.ForeignKey("self", null=True, blank=True,
+                               on_delete=models.CASCADE, related_name="children")
+
+    class Meta:
+        verbose_name_plural = "categories"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["owner", "parent", "name"],
+                                    name="uniq_category_per_parent"),
+        ]
+
+    def clean(self):
+        super().clean()
+        self.name = (self.name or "").strip()
+        if not self.name:
+            raise ValueError("Название категории не может быть пустым")
+        if len(self.name) > 64:
+            raise ValueError("Название категории не длиннее 64 символов")
+        # запрет циклов: родитель не может быть нашим потомком
+        seen, node = {self.pk}, self.parent
+        while node is not None:
+            if node.pk in seen:
+                raise ValueError("Нельзя переместить категорию внутрь самой себя")
+            seen.add(node.pk)
+            node = node.parent
+
+    def __str__(self):
+        return self.name
+
+
 class Note(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notes")
     title = models.CharField("заголовок", max_length=120)
     text = models.TextField("текст", max_length=10000, blank=True)
     category = models.CharField("категория", max_length=64, blank=True)
+    category_obj = models.ForeignKey(Category, null=True, blank=True,
+                                     on_delete=models.SET_NULL, related_name="notes")
     is_pinned = models.BooleanField("закреплена", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
