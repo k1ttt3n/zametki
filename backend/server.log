@@ -1,0 +1,35 @@
+nohup: ignoring input
+OpenBLAS WARNING - could not determine the L2 cache size on this system, assuming 256k
+[26/Oct/2026 07:07:46] "POST /api/auth/register HTTP/1.1" 201 71
+Bad Request: /api/auth/register
+[26/Oct/2026 07:07:46] "POST /api/auth/register HTTP/1.1" 400 55
+/usr/local/lib/python3.12/site-packages/jwt/api_jwt.py:149: InsecureKeyLengthWarning: The HMAC key is 26 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+  return self._jws.encode(
+[26/Oct/2026 07:07:47] "POST /api/auth/login HTTP/1.1" 200 567
+Bad Request: /api/auth/register
+[26/Oct/2026 07:07:50] "POST /api/auth/register HTTP/1.1" 400 55
+/usr/local/lib/python3.12/site-packages/jwt/api_jwt.py:370: InsecureKeyLengthWarning: The HMAC key is 26 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+  decoded = self.decode_complete(
+[26/Oct/2026 07:07:50] "POST /api/notes HTTP/1.1" 201 230
+[26/Oct/2026 07:07:50] "GET /api/notes?search=Ð¾Ð¿Ð°ÑÐ½ÑÐ¹ HTTP/1.1" 200 282
+Unauthorized: /api/notes
+[26/Oct/2026 07:07:50] "GET /api/notes HTTP/1.1" 401 82
+[26/Oct/2026 07:07:54] "POST /api/notes HTTP/1.1" 201 204
+[26/Oct/2026 07:07:54] "GET /api/notes?page=1&limit=5 HTTP/1.1" 200 486
+Unauthorized: /api/notes
+[26/Oct/2026 07:07:55] "GET /api/notes HTTP/1.1" 401 82
+[26/Oct/2026 07:07:55] "GET /api/notes/export/ HTTP/1.1" 200 5374
+[26/Oct/2026 07:08:03] "POST /api/auth/register HTTP/1.1" 201 65
+[26/Oct/2026 07:08:04] "POST /api/auth/login HTTP/1.1" 200 561
+Not Found: /api/notes/1
+[26/Oct/2026 07:08:04] "GET /api/notes/1 HTTP/1.1" 404 43
+[26/Oct/2026 07:08:04] "POST /api/notes/1/files HTTP/1.1" 201 179
+Unsupported Media Type: /api/notes/1/files
+[26/Oct/2026 07:08:04] "POST /api/notes/1/files HTTP/1.1" 415 75
+Request Entity Too Large: /api/notes/1/files
+[26/Oct/2026 07:08:04] "POST /api/notes/1/files HTTP/1.1" 413 51
+[26/Oct/2026 07:08:09] "GET /media/notes/1/20b10cd39dd84255a2b1f70dfac44026.txt HTTP/1.1" 200 11
+[26/Oct/2026 07:08:09] "DELETE /api/files/1 HTTP/1.1" 204 0
+[26/Oct/2026 07:08:09] "PUT /api/notes/2 HTTP/1.1" 200 201
+[26/Oct/2026 07:08:09] "DELETE /api/notes/2 HTTP/1.1" 204 0
+[26/Oct/2026 07:08:09] "POST /api/auth/logout HTTP/1.1" 204 0
