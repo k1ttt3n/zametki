@@ -1,1 +1,8 @@
 dist/
+__pycache__/
+*.pyc
+node_modules/
+backend/staticfiles/
+backend/server.log
+backend/uploads/
+.env
